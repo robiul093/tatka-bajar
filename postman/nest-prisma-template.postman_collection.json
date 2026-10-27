@@ -1,0 +1,553 @@
+{
+  "info": {
+    "_postman_id": "tatka-bajar-collection",
+    "name": "Tatka Bajar API",
+    "description": "Complete Tatka Bajar API collection.\n\n**Base URL:** `{{baseUrl}}/api/v1`\n\n**How to use:**\n1. Import this collection.\n2. Set `baseUrl` in the environment (default: `http://localhost:3000`).\n3. Hit **Login** — `accessToken`, `userToken` or `adminToken` are set automatically based on the returned role.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",     "value": "http://localhost:3000", "type": "string" },
+    { "key": "accessToken", "value": "",                      "type": "string" },
+    { "key": "userToken",   "value": "",                      "type": "string" },
+    { "key": "adminToken",  "value": "",                      "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Base API",
+      "description": "Base API health and status endpoint",
+      "item": [
+        {
+          "name": "Get Base Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}",
+              "host": ["{{baseUrl}}"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Application Server Running Successfully!\",\n  \"meta\": null,\n  \"data\": null,\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Authentication & authorization endpoints",
+      "item": [
+        {
+          "name": "Sign Up",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "signup"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"01700000000\",\n  \"password\": \"Password@123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"statusCode\": 201,\n  \"message\": \"Registration successful. Please verify your email\",\n  \"meta\": null,\n  \"data\": {\n    \"userId\": \"uuid\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"01700000000\",\n    \"role\": \"USER\",\n    \"status\": \"INACTIVE\",\n    \"isVerified\": false,\n    \"profile\": null,\n    \"createdAt\": \"2026-09-04T12:00:00.000Z\",\n    \"updatedAt\": \"2026-09-04T12:00:00.000Z\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP (Account Activation)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-otp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Email verified successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"Email verified successfully\",\n    \"isVerified\": true\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/resend-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "resend-otp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"type\": \"VERIFICATION\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"OTP sent successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"OTP sent successfully\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "forgot-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"OTP sent successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"OTP sent successfully\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify Reset Password OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-reset-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-reset-otp"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"OTP verified successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"OTP verified successfully\",\n    \"valid\": true\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "reset-password"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword@123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Password reset successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"Password reset successfully\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.tokens) {",
+                  "  const token = res.data.tokens.accessToken;",
+                  "  const role  = res.data.user && res.data.user.role;",
+                  "",
+                  "  // Always store the generic accessToken",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "",
+                  "  // Store role-specific token",
+                  "  if (role === 'USER') {",
+                  "    pm.collectionVariables.set('userToken', token);",
+                  "    console.log('userToken set for role:', role);",
+                  "  } else if (role === 'ADMIN') {",
+                  "    pm.collectionVariables.set('adminToken', token);",
+                  "    console.log('adminToken set for role:', role);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Password@123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Login successful\",\n  \"meta\": null,\n  \"data\": {\n    \"tokens\": {\n      \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\",\n      \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9...\"\n    },\n    \"user\": {\n      \"userId\": \"uuid\",\n      \"name\": \"John Doe\",\n      \"email\": \"john@example.com\",\n      \"phone\": \"01700000000\",\n      \"role\": \"USER\",\n      \"status\": \"ACTIVE\",\n      \"isVerified\": true\n    }\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.tokens) {",
+                  "  const token = res.data.tokens.accessToken;",
+                  "  const role  = res.data.user && res.data.user.role;",
+                  "",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "",
+                  "  if (role === 'USER') {",
+                  "    pm.collectionVariables.set('userToken', token);",
+                  "    console.log('userToken set for role:', role);",
+                  "  } else if (role === 'ADMIN') {",
+                  "    pm.collectionVariables.set('adminToken', token);",
+                  "    console.log('adminToken set for role:', role);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"SuperSecurePassword123!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh-token"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"<userId>\",\n  \"refreshToken\": \"<refreshToken>\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Token refreshed successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\",\n    \"refreshToken\": \"eyJhbGciOiJIUzI1NiJ9...\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Me (Current User)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"User profile fetched successfully\",\n  \"meta\": null,\n  \"data\": {\n    \"id\": \"uuid\",\n    \"userId\": \"uuid\",\n    \"name\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"phone\": \"01700000000\",\n    \"role\": \"USER\",\n    \"status\": \"ACTIVE\",\n    \"isVerified\": true,\n    \"profile\": null,\n    \"isNotification\": true,\n    \"isAgree\": false,\n    \"createdAt\": \"2026-09-04T12:00:00.000Z\",\n    \"updatedAt\": \"2026-09-04T12:00:00.000Z\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"statusCode\": 200,\n  \"message\": \"Logout successful\",\n  \"meta\": null,\n  \"data\": {\n    \"message\": \"Logout successful\"\n  },\n  \"timestamp\": \"2026-09-04T12:00:00.000Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "User management endpoints",
+      "item": []
+    },
+    {
+      "name": "Category",
+      "description": "Category endpoints",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/categories"
+          }
+        },
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fresh Vegetables\",\n  \"description\": \"Locally grown farm fresh vegetables\",\n  \"image\": \"https://images.unsplash.com/photo-1540420773420-3366772f4999\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "Product catalog endpoints",
+      "item": [
+        {
+          "name": "Get All Products (With Filters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/products?page=1&limit=12&isFeatured=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "12" },
+                { "key": "isFeatured", "value": "true" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Product (Admin/Seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoryId\": \"<category-id>\",\n  \"name\": \"Fresh Deshi Tomato\",\n  \"description\": \"Naturally ripened, fresh red deshi tomatoes\",\n  \"price\": 60,\n  \"discountPrice\": 50,\n  \"stock\": 100,\n  \"unit\": \"KG\",\n  \"unitValue\": 1,\n  \"isOrganic\": true,\n  \"isFeatured\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Address",
+      "description": "Customer address endpoints",
+      "item": [
+        {
+          "name": "Get Addresses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+            "url": "{{baseUrl}}/api/v1/addresses"
+          }
+        },
+        {
+          "name": "Add Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/addresses",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Home\",\n  \"recipientName\": \"John Doe\",\n  \"phone\": \"01700000000\",\n  \"streetAddress\": \"House 12, Road 4\",\n  \"area\": \"Uttara\",\n  \"city\": \"Dhaka\",\n  \"isDefault\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "description": "Shopping cart endpoints",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+            "url": "{{baseUrl}}/api/v1/cart"
+          }
+        },
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/cart/items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"<product-id>\",\n  \"quantity\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order",
+      "description": "Order placement and tracking endpoints",
+      "item": [
+        {
+          "name": "Checkout Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromCart\": true,\n  \"paymentMethod\": \"CASH_ON_DELIVERY\",\n  \"deliveryFee\": 60,\n  \"deliveryNotes\": \"Call before arrival\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "My Orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{userToken}}" }],
+            "url": "{{baseUrl}}/api/v1/orders"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Review",
+      "description": "Product review endpoints",
+      "item": [
+        {
+          "name": "Add / Update Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"<product-id>\",\n  \"rating\": 5,\n  \"comment\": \"Exceptional freshness and fast delivery!\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
