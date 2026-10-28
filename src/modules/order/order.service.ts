@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '@prisma/client';
 import { CreateOrderDto, EstimateCheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
@@ -30,6 +32,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -384,6 +387,19 @@ export class OrderService {
         });
     }
 
+    // Asynchronously dispatch in-app notification
+    this.notificationService
+      .createNotification({
+        userId: order.userId,
+        title: 'Order Placed Successfully',
+        body: `Your order ${order.orderNumber} for ৳${order.totalAmount.toFixed(2)} has been placed.`,
+        type: NotificationType.ORDER,
+        metadata: { orderId: order.orderId, orderNumber: order.orderNumber },
+      })
+      .catch((err) => {
+        this.logger.warn(`Failed to dispatch in-app notification: ${err.message}`);
+      });
+
     return order;
   }
 
@@ -472,7 +488,7 @@ export class OrderService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const cancelledOrder = await this.prisma.$transaction(async (tx) => {
       // Restore stock and revert sales tracking
       for (const item of order.items) {
         await tx.product.update({
@@ -491,9 +507,33 @@ export class OrderService {
         include: {
           items: true,
           address: true,
+          user: { select: { userId: true, name: true, email: true } },
         },
       });
     });
+
+    if (cancelledOrder.user?.email) {
+      this.mailService
+        .sendOrderStatusUpdateEmail(
+          cancelledOrder.user.email,
+          cancelledOrder.orderNumber,
+          'CANCELLED',
+          cancelledOrder.user.name,
+        )
+        .catch((err) => this.logger.warn(`Failed to send order cancel email: ${err.message}`));
+    }
+
+    this.notificationService
+      .createNotification({
+        userId: cancelledOrder.userId,
+        title: 'Order Cancelled',
+        body: `Your order ${cancelledOrder.orderNumber} has been cancelled.`,
+        type: NotificationType.ORDER,
+        metadata: { orderId: cancelledOrder.orderId, status: 'CANCELLED' },
+      })
+      .catch((err) => this.logger.warn(`Failed to create cancel notification: ${err.message}`));
+
+    return cancelledOrder;
   }
 
   async findAllAdmin(status?: string, page = 1, limit = 20) {
@@ -612,12 +652,13 @@ export class OrderService {
       }
     }
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { orderId },
       data,
       include: {
         items: true,
         address: true,
+        user: { select: { userId: true, name: true, email: true } },
         rider: {
           include: {
             user: { select: { name: true, phone: true } },
@@ -625,6 +666,29 @@ export class OrderService {
         },
       },
     });
+
+    if (updatedOrder.user?.email) {
+      this.mailService
+        .sendOrderStatusUpdateEmail(
+          updatedOrder.user.email,
+          updatedOrder.orderNumber,
+          updatedOrder.status,
+          updatedOrder.user.name,
+        )
+        .catch((err) => this.logger.warn(`Failed to send status update email: ${err.message}`));
+    }
+
+    this.notificationService
+      .createNotification({
+        userId: updatedOrder.userId,
+        title: `Order Status: ${updatedOrder.status}`,
+        body: `Your order ${updatedOrder.orderNumber} is now ${updatedOrder.status}.`,
+        type: NotificationType.ORDER,
+        metadata: { orderId: updatedOrder.orderId, status: updatedOrder.status },
+      })
+      .catch((err) => this.logger.warn(`Failed to create status notification: ${err.message}`));
+
+    return updatedOrder;
   }
 
   async assignRider(orderId: string, riderId: string) {
@@ -652,7 +716,7 @@ export class OrderService {
       throw new BadRequestException('Cannot assign an inactive rider');
     }
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { orderId },
       data: {
         riderId,
@@ -661,12 +725,49 @@ export class OrderService {
       include: {
         items: true,
         address: true,
+        user: { select: { userId: true, name: true, email: true } },
         rider: {
           include: {
-            user: { select: { name: true, phone: true } },
+            user: { select: { userId: true, name: true, phone: true } },
           },
         },
       },
     });
+
+    if (updatedOrder.user?.email && updatedOrder.rider?.user) {
+      this.mailService
+        .sendRiderAssignedEmail(
+          updatedOrder.user.email,
+          updatedOrder.orderNumber,
+          updatedOrder.rider.user.name,
+          updatedOrder.rider.user.phone,
+          updatedOrder.user.name,
+        )
+        .catch((err) => this.logger.warn(`Failed to send rider assigned email: ${err.message}`));
+    }
+
+    if (updatedOrder.rider?.user) {
+      this.notificationService
+        .createNotification({
+          userId: updatedOrder.userId,
+          title: 'Rider Assigned',
+          body: `${updatedOrder.rider.user.name} (${updatedOrder.rider.user.phone}) has been assigned to deliver order ${updatedOrder.orderNumber}.`,
+          type: NotificationType.DELIVERY,
+          metadata: { orderId: updatedOrder.orderId, riderId },
+        })
+        .catch((err) => this.logger.warn(`Failed to create user rider notification: ${err.message}`));
+
+      this.notificationService
+        .createNotification({
+          userId: updatedOrder.rider.user.userId,
+          title: 'New Delivery Assigned',
+          body: `You have been assigned order ${updatedOrder.orderNumber}. Please prepare for delivery.`,
+          type: NotificationType.DELIVERY,
+          metadata: { orderId: updatedOrder.orderId },
+        })
+        .catch((err) => this.logger.warn(`Failed to create rider assigned notification: ${err.message}`));
+    }
+
+    return updatedOrder;
   }
 }

@@ -16,6 +16,10 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { MailModule } from './modules/mail/mail.module';
 import { SeederModule } from './modules/seeder/seeder.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { RiderModule } from './modules/rider/rider.module';
+import { BannerModule } from './modules/banner/banner.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import envConfig from './config/env.config';
 
 @Module({
@@ -38,6 +42,10 @@ import envConfig from './config/env.config';
     CloudinaryModule,
     SeederModule,
     UploadModule,
+    RiderModule,
+    BannerModule,
+    AnalyticsModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

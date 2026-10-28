@@ -160,6 +160,87 @@ export class MailService {
     );
   }
 
+  async sendOrderStatusUpdateEmail(
+    to: string,
+    orderNumber: string,
+    status: string,
+    name?: string,
+    notes?: string,
+  ): Promise<void> {
+    const env = this.configService.get<IEnv>('env');
+    const appName = env?.APPLICATION.APP_NAME || 'Tatka Bajar';
+    const displayName = name || 'Customer';
+    const subject = `Order ${orderNumber} Status: ${status} - ${appName}`;
+
+    const statusColors: Record<string, string> = {
+      CONFIRMED: '#2563eb',
+      PROCESSING: '#0891b2',
+      OUT_FOR_DELIVERY: '#d97706',
+      DELIVERED: '#16a34a',
+      CANCELLED: '#dc2626',
+    };
+    const color = statusColors[status] || '#16a34a';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #16a34a; margin: 0;">🛒 ${appName}</h1>
+          <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Order Status Update</p>
+        </div>
+        <div style="background: #f8fafc; border-left: 4px solid ${color}; padding: 16px; border-radius: 4px; margin-bottom: 20px;">
+          <p style="margin: 0; color: #334155; font-size: 15px;">Hello <strong>${displayName}</strong>,</p>
+          <p style="margin: 8px 0 0 0; color: #0f172a; font-size: 16px;">Your order <strong>${orderNumber}</strong> is now <span style="font-weight: bold; color: ${color};">${status}</span>.</p>
+          ${notes ? `<p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px;"><em>${notes}</em></p>` : ''}
+        </div>
+        <p style="color: #64748b; font-size: 13px; line-height: 1.5;">You can check your live order progress in the Tatka Bajar app.</p>
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0 16px 0;" />
+        <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
+      </div>
+    `;
+
+    await this.sendMail(
+      to,
+      subject,
+      html,
+      `Your order ${orderNumber} is now ${status}.`,
+    );
+  }
+
+  async sendRiderAssignedEmail(
+    to: string,
+    orderNumber: string,
+    riderName: string,
+    riderPhone: string,
+    name?: string,
+  ): Promise<void> {
+    const env = this.configService.get<IEnv>('env');
+    const appName = env?.APPLICATION.APP_NAME || 'Tatka Bajar';
+    const displayName = name || 'Customer';
+    const subject = `Rider Assigned to Your Order ${orderNumber} - ${appName}`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 10px; background: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #16a34a; margin: 0;">🛒 ${appName}</h1>
+          <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Delivery Update</p>
+        </div>
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="color: #1e40af; margin: 0 0 8px 0;">🏍️ Rider Assigned!</h3>
+          <p style="margin: 0; color: #1e3a8a; font-size: 14px;">Hello <strong>${displayName}</strong>, delivery rider <strong>${riderName}</strong> (${riderPhone}) has been assigned to your order <strong>${orderNumber}</strong> and will deliver it shortly.</p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 24px 0 16px 0;" />
+        <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">&copy; ${new Date().getFullYear()} ${appName}. All rights reserved.</p>
+      </div>
+    `;
+
+    await this.sendMail(
+      to,
+      subject,
+      html,
+      `Rider ${riderName} (${riderPhone}) has been assigned to your order ${orderNumber}.`,
+    );
+  }
+
   private async sendMail(
     to: string,
     subject: string,
