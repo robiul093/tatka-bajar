@@ -12,12 +12,6 @@ import { NotificationType } from '@prisma/client';
 import { CreateOrderDto, EstimateCheckoutDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
-// Central Warehouse / Distribution Hub Coordinates (Dhaka Central Hub)
-export const CENTRAL_WAREHOUSE = {
-  latitude: 23.7516,
-  longitude: 90.3944,
-};
-
 export const DELIVERY_RULES = {
   BASE_FEE: 40, // BDT base fee within 3 km
   PER_KM_RATE: 10, // BDT per additional km beyond 3 km
@@ -64,37 +58,39 @@ export class OrderService {
   }
 
   /**
-   * Calculates delivery fee based on order subtotal and customer coordinates
+   * Calculates delivery fee based on order subtotal, customer coordinates, and product origin coordinates
    */
   public calculateDeliveryFee(
     subtotal: number,
-    lat?: number | null,
-    lng?: number | null,
+    deliveryLat?: number | null,
+    deliveryLng?: number | null,
+    originLat?: number | null,
+    originLng?: number | null,
   ): { deliveryFee: number; distanceKm: number | null; freeDeliveryEligible: boolean } {
     // 1. Check if eligible for free delivery promotion
     if (subtotal >= DELIVERY_RULES.FREE_DELIVERY_THRESHOLD) {
       return {
         deliveryFee: 0,
         distanceKm:
-          lat != null && lng != null
-            ? this.calculateDistanceKm(
-                CENTRAL_WAREHOUSE.latitude,
-                CENTRAL_WAREHOUSE.longitude,
-                lat,
-                lng,
-              )
+          deliveryLat != null && deliveryLng != null && originLat != null && originLng != null
+            ? this.calculateDistanceKm(originLat, originLng, deliveryLat, deliveryLng)
             : null,
         freeDeliveryEligible: true,
       };
     }
 
-    // 2. If coordinates are provided, compute distance-based fee
-    if (lat != null && lng != null) {
+    // 2. If both origin and delivery coordinates are provided, compute distance-based fee
+    if (
+      deliveryLat != null &&
+      deliveryLng != null &&
+      originLat != null &&
+      originLng != null
+    ) {
       const distanceKm = this.calculateDistanceKm(
-        CENTRAL_WAREHOUSE.latitude,
-        CENTRAL_WAREHOUSE.longitude,
-        lat,
-        lng,
+        originLat,
+        originLng,
+        deliveryLat,
+        deliveryLng,
       );
 
       if (distanceKm <= 3) {
@@ -115,7 +111,7 @@ export class OrderService {
       };
     }
 
-    // 3. Fallback standard delivery fee
+    // 3. Fallback standard delivery fee if coordinates are not available
     return {
       deliveryFee: DELIVERY_RULES.DEFAULT_STANDARD_FEE,
       distanceKm: null,
@@ -152,6 +148,23 @@ export class OrderService {
 
     let subtotal = 0;
     let totalItems = 0;
+    let primaryOriginLat: number | null = null;
+    let primaryOriginLng: number | null = null;
+    let maxDistanceKm: number | null = null;
+
+    // Resolve coordinates from addressId if provided
+    let userLat: number | null = null;
+    let userLng: number | null = null;
+
+    if (dto.addressId) {
+      const address = await this.prisma.address.findFirst({
+        where: { addressId: dto.addressId, userId },
+      });
+      if (address) {
+        userLat = address.latitude;
+        userLng = address.longitude;
+      }
+    }
 
     for (const item of itemsToProcess) {
       const product = await this.prisma.product.findUnique({
@@ -169,26 +182,37 @@ export class OrderService {
 
       subtotal += Number((unitPrice * item.quantity).toFixed(2));
       totalItems += item.quantity;
+
+      if (
+        product.originLat != null &&
+        product.originLng != null &&
+        userLat != null &&
+        userLng != null
+      ) {
+        const d = this.calculateDistanceKm(
+          product.originLat,
+          product.originLng,
+          userLat,
+          userLng,
+        );
+        if (maxDistanceKm === null || d > maxDistanceKm) {
+          maxDistanceKm = d;
+          primaryOriginLat = product.originLat;
+          primaryOriginLng = product.originLng;
+        }
+      }
     }
 
     subtotal = Number(subtotal.toFixed(2));
 
-    // Resolve coordinates from addressId if provided
-    let userLat: number | null = null;
-    let userLng: number | null = null;
-
-    if (dto.addressId) {
-      const address = await this.prisma.address.findFirst({
-        where: { addressId: dto.addressId, userId },
-      });
-      if (address) {
-        userLat = address.latitude;
-        userLng = address.longitude;
-      }
-    }
-
     const { deliveryFee, distanceKm, freeDeliveryEligible } =
-      this.calculateDeliveryFee(subtotal, userLat, userLng);
+      this.calculateDeliveryFee(
+        subtotal,
+        userLat,
+        userLng,
+        primaryOriginLat,
+        primaryOriginLng,
+      );
 
     const amountNeededForFreeDelivery =
       subtotal < DELIVERY_RULES.FREE_DELIVERY_THRESHOLD
@@ -251,6 +275,10 @@ export class OrderService {
 
     // Validate products and check live stock
     let subtotal = 0;
+    let primaryOriginLat: number | null = null;
+    let primaryOriginLng: number | null = null;
+    let maxDistanceKm: number | null = null;
+
     const resolvedItems: {
       productId: string;
       productName: string;
@@ -285,6 +313,25 @@ export class OrderService {
       const itemTotal = Number((unitPrice * item.quantity).toFixed(2));
       subtotal += itemTotal;
 
+      if (
+        product.originLat != null &&
+        product.originLng != null &&
+        deliveryLat != null &&
+        deliveryLng != null
+      ) {
+        const d = this.calculateDistanceKm(
+          product.originLat,
+          product.originLng,
+          deliveryLat,
+          deliveryLng,
+        );
+        if (maxDistanceKm === null || d > maxDistanceKm) {
+          maxDistanceKm = d;
+          primaryOriginLat = product.originLat;
+          primaryOriginLng = product.originLng;
+        }
+      }
+
       resolvedItems.push({
         productId: product.productId,
         productName: product.name,
@@ -298,7 +345,7 @@ export class OrderService {
 
     subtotal = Number(subtotal.toFixed(2));
 
-    // Dynamic delivery fee calculation
+    // Dynamic delivery fee calculation based on product origin (originLat, originLng) and delivery coordinates
     let deliveryFee: number;
     if (dto.deliveryFee !== undefined && dto.deliveryFee !== null) {
       // If client supplied deliveryFee, respect it or check free delivery threshold
@@ -307,7 +354,13 @@ export class OrderService {
           ? 0
           : Number(dto.deliveryFee);
     } else {
-      deliveryFee = this.calculateDeliveryFee(subtotal, deliveryLat, deliveryLng).deliveryFee;
+      deliveryFee = this.calculateDeliveryFee(
+        subtotal,
+        deliveryLat,
+        deliveryLng,
+        primaryOriginLat,
+        primaryOriginLng,
+      ).deliveryFee;
     }
 
     const totalAmount = Number((subtotal + deliveryFee).toFixed(2));

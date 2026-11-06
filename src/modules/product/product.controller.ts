@@ -25,7 +25,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ProductService } from './product.service';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
-import { CreateProductDto } from './dto/create-product.dto';
+import { CreateProductDto, ProductUnitEnum } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -53,13 +53,34 @@ export class ProductController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('access-token')
+  @UseInterceptors(FilesInterceptor('images', 8))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Create new product (Admin only)',
+    summary: 'Create new product with image file uploads (Admin only)',
     description:
-      'Creates a new product with optional discount toggle, discount price or discount percent.',
+      'Creates a new product. Up to 8 image files can be uploaded directly as binary files (multipart/form-data).',
   })
   @ApiResponse({ status: 201, description: 'Product created successfully' })
-  async create(@Body() createProductDto: CreateProductDto) {
+  async create(
+    @Body() createProductDto: CreateProductDto,
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    if (files && files.length > 0) {
+      const uploadedUrls = await this.cloudinaryService.uploadMultipleImages(
+        files,
+        'tatka-bajar/products',
+      );
+      createProductDto.images = uploadedUrls;
+    } else if (typeof createProductDto.images === 'string') {
+      try {
+        createProductDto.images = JSON.parse(createProductDto.images);
+      } catch {
+        createProductDto.images = [createProductDto.images];
+      }
+    } else if (!createProductDto.images) {
+      createProductDto.images = [];
+    }
+
     const data = await this.productService.create(createProductDto);
     return sendResponse(HttpStatus.CREATED, 'Product created successfully', data);
   }
@@ -154,6 +175,16 @@ export class ProductController {
     );
   }
 
+  @Get('units')
+  @ApiOperation({ summary: 'Get all product units for dropdown select' })
+  getProductUnits() {
+    return sendResponse(
+      HttpStatus.OK,
+      'Product units fetched successfully',
+      Object.values(ProductUnitEnum),
+    );
+  }
+
   @Get(':idOrSlug')
   @ApiOperation({ summary: 'Get product details by ID or Slug' })
   async findOne(@Param('idOrSlug') idOrSlug: string) {
@@ -165,14 +196,36 @@ export class ProductController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('access-token')
+  @UseInterceptors(FilesInterceptor('images', 8))
+  @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Update product (Admin only)',
-    description: 'Update any product field including toggling discount on/off or setting discount price/percent.',
+    summary: 'Update product with optional new image files (Admin only)',
+    description:
+      'Update any product field including toggling discount on/off or setting discount price/percent. Uploaded images are appended to the gallery.',
   })
   async update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
+    if (files && files.length > 0) {
+      const uploadedUrls = await this.cloudinaryService.uploadMultipleImages(
+        files,
+        'tatka-bajar/products',
+      );
+      const existingProduct = await this.productService.findOne(id);
+      updateProductDto.images = [
+        ...(existingProduct.images || []),
+        ...uploadedUrls,
+      ];
+    } else if (typeof updateProductDto.images === 'string') {
+      try {
+        updateProductDto.images = JSON.parse(updateProductDto.images);
+      } catch {
+        updateProductDto.images = [updateProductDto.images];
+      }
+    }
+
     const data = await this.productService.update(id, updateProductDto);
     return sendResponse(HttpStatus.OK, 'Product updated successfully', data);
   }

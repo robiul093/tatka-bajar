@@ -19,6 +19,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     prisma = {
+      $transaction: jest.fn(async (cb) => cb(prisma)),
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
@@ -124,6 +125,23 @@ describe('AuthService', () => {
           password: 'Password@123',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should abort and throw when email sending fails', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue({ userId: 'temp-id' });
+      mailService.sendVerificationOtpEmail.mockRejectedValueOnce(
+        new Error('Invalid login: 535-5.7.8 Username and Password not accepted'),
+      );
+
+      await expect(
+        service.userSignUp({
+          name: 'Jane Doe',
+          email: 'jane@example.com',
+          phone: '01712345678',
+          password: 'Password@123',
+        }),
+      ).rejects.toThrow('Invalid login: 535-5.7.8 Username and Password not accepted');
     });
   });
 
@@ -313,6 +331,106 @@ describe('AuthService', () => {
           password: 'Password@123',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should store fcmToken during login if provided', async () => {
+      const hashedPassword = await bcrypt.hash('Password@123', 10);
+      prisma.user.findUnique.mockResolvedValue({
+        userId: 'user-uuid-1',
+        email: 'user@example.com',
+        isVerified: true,
+        status: 'ACTIVE',
+        password: hashedPassword,
+        fcmToken: null,
+      });
+
+      const result = await service.signIn({
+        email: 'user@example.com',
+        password: 'Password@123',
+        fcmToken: 'test-fcm-token',
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-uuid-1' },
+          data: expect.objectContaining({
+            fcmToken: 'test-fcm-token',
+          }),
+        }),
+      );
+      expect(result.user.fcmToken).toBe('test-fcm-token');
+    });
+  });
+
+  describe('resendOtp', () => {
+    it('should throw BadRequestException if email is already verified', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        userId: 'user-uuid-1',
+        email: 'verified@example.com',
+        isVerified: true,
+      });
+
+      await expect(
+        service.resendOtp({
+          email: 'verified@example.com',
+        }),
+      ).rejects.toThrow(new BadRequestException('Email is already verified'));
+    });
+  });
+
+  describe('changePassword', () => {
+    it('should change password successfully when old password is correct', async () => {
+      const oldPassword = 'OldPassword@123';
+      const hashedPassword = await bcrypt.hash(oldPassword, 10);
+      prisma.user.findUnique.mockResolvedValue({
+        userId: 'user-uuid-1',
+        password: hashedPassword,
+      });
+
+      const result = await service.changePassword('user-uuid-1', {
+        oldPassword,
+        newPassword: 'NewPassword@123',
+      });
+
+      expect(result.message).toBe('Password changed successfully');
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-uuid-1' },
+          data: expect.objectContaining({
+            refreshToken: null,
+          }),
+        }),
+      );
+    });
+
+    it('should throw BadRequestException if old password does not match', async () => {
+      const hashedPassword = await bcrypt.hash('CorrectPassword@123', 10);
+      prisma.user.findUnique.mockResolvedValue({
+        userId: 'user-uuid-1',
+        password: hashedPassword,
+      });
+
+      await expect(
+        service.changePassword('user-uuid-1', {
+          oldPassword: 'WrongPassword@123',
+          newPassword: 'NewPassword@123',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('logout', () => {
+    it('should nullify refreshToken and fcmToken on logout', async () => {
+      const result = await service.logout('user-uuid-1');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 'user-uuid-1' },
+        data: {
+          refreshToken: null,
+          fcmToken: null,
+        },
+      });
+      expect(result.message).toBeDefined();
     });
   });
 });
