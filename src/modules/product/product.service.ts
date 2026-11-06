@@ -137,6 +137,8 @@ export class ProductService {
         isDiscount,
         stock: dto.stock ?? 0,
         location: dto.location,
+        originLat: dto.originLat ?? null,
+        originLng: dto.originLng ?? null,
         isOrganic: dto.isOrganic ?? false,
         isSeasonal: dto.isSeasonal ?? false,
         isFeatured: dto.isFeatured ?? false,

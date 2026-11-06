@@ -26,11 +26,12 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
@@ -46,7 +47,7 @@ export class AuthController {
     return sendResponse(
       HttpStatus.CREATED,
       SUCCESS_MESSAGES.AUTH.REGISTRATION_SUCCESS,
-      result,
+      null,
     );
   }
 
@@ -148,6 +149,21 @@ export class AuthController {
       'User profile fetched successfully',
       result,
     );
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  @ApiOkResponse({ description: 'Password changed successfully' })
+  async changePassword(
+    @GetCurrentUser() user: any,
+    @Body() data: ChangePasswordDto,
+  ) {
+    const id = user?.id || user?.userId || user?.sub;
+    const result = await this.authService.changePassword(id, data);
+    return sendResponse(HttpStatus.OK, 'Password changed successfully', result);
   }
 
   @ApiBearerAuth('access-token')

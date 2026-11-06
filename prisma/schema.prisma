@@ -196,6 +196,8 @@ model Product {
   isDiscount    Boolean     @default(false)
   stock         Int         @default(0)
   location      String?
+  originLat     Float?
+  originLng     Float?
   isOrganic     Boolean     @default(false)
   isSeasonal    Boolean     @default(false)
   isFeatured    Boolean     @default(false)

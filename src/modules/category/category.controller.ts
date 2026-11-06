@@ -43,9 +43,24 @@ export class CategoryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Create new category (Admin only)' })
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Create new category with image file upload (Admin only)',
+    description: 'Creates a new category. Image file can be uploaded directly as binary (multipart/form-data).',
+  })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
-  async create(@Body() createCategoryDto: CreateCategoryDto) {
+  async create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @UploadedFile() imageFile?: Express.Multer.File,
+  ) {
+    if (imageFile) {
+      const imageUrl = await this.cloudinaryService.uploadImage(
+        imageFile,
+        'tatka-bajar/categories',
+      );
+      createCategoryDto.image = imageUrl;
+    }
     const data = await this.categoryService.create(createCategoryDto);
     return sendResponse(HttpStatus.CREATED, 'Category created successfully', data);
   }
@@ -69,11 +84,24 @@ export class CategoryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Update category (Admin only)' })
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Update category with optional new image file (Admin only)',
+    description: 'Updates category fields and optionally replaces the image file.',
+  })
   async update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @UploadedFile() imageFile?: Express.Multer.File,
   ) {
+    if (imageFile) {
+      const imageUrl = await this.cloudinaryService.uploadImage(
+        imageFile,
+        'tatka-bajar/categories',
+      );
+      updateCategoryDto.image = imageUrl;
+    }
     const data = await this.categoryService.update(id, updateCategoryDto);
     return sendResponse(HttpStatus.OK, 'Category updated successfully', data);
   }

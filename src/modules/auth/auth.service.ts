@@ -22,6 +22,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { OtpType, ResendOtpDto } from './dto/resend-otp.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -30,7 +31,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   async hash(text: string): Promise<string> {
     return bcrypt.hash(text, 10);
@@ -62,45 +63,59 @@ export class AuthService {
       },
     });
 
-    if (user)
-      throw new BadRequestException(ERROR_MESSAGES.USER.USER_ALREADY_EXISTS);
-    if (checkPhone)
-      throw new BadRequestException(ERROR_MESSAGES.USER.PHONE_ALREADY_EXISTS);
+    if (user) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.USER.USER_ALREADY_EXISTS,
+      );
+    }
+
+    if (checkPhone) {
+      throw new BadRequestException(
+        ERROR_MESSAGES.USER.PHONE_ALREADY_EXISTS,
+      );
+    }
 
     const hashedPassword = await this.hash(data.password);
     const otp = this.generateOtp();
     const otpExpiresAt = this.getOtpExpiry();
 
-    const createdUser = await this.prisma.user.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        password: hashedPassword,
-        role: 'USER',
-        status: 'INACTIVE',
-        isVerified: false,
-        verifiedOtp: otp,
-        verifiedOtpExpireAt: otpExpiresAt,
-      },
-      select: {
-        userId: true,
-        name: true,
-        email: true,
-        phone: true,
-        profile: true,
-        role: true,
-        status: true,
-        isVerified: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    return await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: hashedPassword,
+          role: 'USER',
+          status: 'INACTIVE',
+          isVerified: false,
+          verifiedOtp: otp,
+          verifiedOtpExpireAt: otpExpiresAt,
+        },
+        select: {
+          userId: true,
+          name: true,
+          email: true,
+          phone: true,
+          profile: true,
+          role: true,
+          status: true,
+          isVerified: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // If email fails, this throws an exception
+      // and Prisma automatically rolls back.
+      await this.mailService.sendVerificationOtpEmail(
+        data.email,
+        otp,
+        data.name,
+      );
+
+      return createdUser;
     });
-
-    // Send verification email with OTP
-    await this.mailService.sendVerificationOtpEmail(data.email, otp, data.name);
-
-    return createdUser;
   }
 
   async verifyOtp(data: VerifyOtpDto) {
@@ -255,6 +270,10 @@ export class AuthService {
       throw new NotFoundException(ERROR_MESSAGES.USER.USER_NOT_FOUND);
     }
 
+    if (type === OtpType.VERIFICATION && user.isVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
     const otp = this.generateOtp();
     const otpExpiresAt = this.getOtpExpiry();
 
@@ -301,7 +320,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('User not found');
     }
 
     if (user.status === 'SUSPEND') {
@@ -309,7 +328,7 @@ export class AuthService {
     }
 
     if (!user.isVerified || user.status === 'INACTIVE') {
-      throw new UnauthorizedException(ERROR_MESSAGES.AUTH.ACCOUNT_NOT_VERIFIED);
+      throw new UnauthorizedException("Account not verified or inactive");
     }
 
     const isPasswordValid = await bcrypt.compare(data.password, user.password);
@@ -319,7 +338,11 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.userId, user.email);
 
-    await this.updateRefreshToken(user.userId, tokens.refreshToken);
+    await this.updateRefreshToken(
+      user.userId,
+      tokens.refreshToken,
+      data.fcmToken,
+    );
 
     const {
       password: _password,
@@ -330,6 +353,10 @@ export class AuthService {
       refreshToken: _refreshToken,
       ...rest
     } = user;
+
+    if (data.fcmToken !== undefined) {
+      rest.fcmToken = data.fcmToken;
+    }
 
     return {
       message: SUCCESS_MESSAGES.AUTH.LOGIN_SUCCESS,
@@ -389,14 +416,24 @@ export class AuthService {
     };
   }
 
-  async updateRefreshToken(userId: string, refreshToken: string) {
+  async updateRefreshToken(
+    userId: string,
+    refreshToken: string,
+    fcmToken?: string,
+  ) {
     const hashed = await bcrypt.hash(refreshToken, 10);
+
+    const updateData: { refreshToken: string; fcmToken?: string } = {
+      refreshToken: hashed,
+    };
+
+    if (fcmToken !== undefined) {
+      updateData.fcmToken = fcmToken;
+    }
 
     await this.prisma.user.update({
       where: { userId: userId },
-      data: {
-        refreshToken: hashed,
-      },
+      data: updateData,
     });
   }
 
@@ -422,11 +459,47 @@ export class AuthService {
     return tokens;
   }
 
+  async changePassword(userId: string, data: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER.USER_NOT_FOUND);
+    }
+
+    const isMatch = await bcrypt.compare(data.oldPassword, user.password);
+    if (!isMatch) {
+      throw new BadRequestException('Current password does not match');
+    }
+
+    if (data.oldPassword === data.newPassword) {
+      throw new BadRequestException(
+        'New password cannot be the same as your current password',
+      );
+    }
+
+    const hashedPassword = await this.hash(data.newPassword);
+
+    await this.prisma.user.update({
+      where: { userId },
+      data: {
+        password: hashedPassword,
+        refreshToken: null, // Invalidate existing session refresh tokens for security
+      },
+    });
+
+    return {
+      message: 'Password changed successfully',
+    };
+  }
+
   async logout(userId: string) {
     await this.prisma.user.update({
       where: { userId: userId },
       data: {
         refreshToken: null,
+        fcmToken: null,
       },
     });
 

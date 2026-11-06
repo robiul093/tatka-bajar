@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { IEnv } from '../../config/env.config';
@@ -261,6 +261,12 @@ export class MailService {
     );
 
     if (!this.transporter) {
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'production') {
+        throw new InternalServerErrorException(
+          'Email transporter is not configured on the server.',
+        );
+      }
       return;
     }
 
@@ -275,8 +281,12 @@ export class MailService {
       this.logger.log(`Email successfully dispatched to ${to}`);
     } catch (error) {
       const err = error as Error;
-      this.logger.warn(
-        `Failed to send email to ${to}: ${err.message}. (Fallback logged in console above)`,
+      this.logger.error(
+        `Failed to send email to ${to}: ${err.message}`,
+        err.stack,
+      );
+      throw new InternalServerErrorException(
+        `Failed to send email: ${err.message}`,
       );
     }
   }

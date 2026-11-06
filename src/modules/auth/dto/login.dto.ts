@@ -1,14 +1,22 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'user@gmail.com' })
+  @ApiProperty({ example: 'user@example.com' })
   @IsString()
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: '12345678' })
+  @ApiProperty({ example: 'User@123456' })
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiPropertyOptional({
+    description: 'Optional Firebase Cloud Messaging (FCM) device token for push notifications',
+    example: 'dK12...fcm_token_example',
+  })
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
 }
