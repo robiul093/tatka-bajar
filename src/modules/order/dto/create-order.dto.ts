@@ -66,11 +66,14 @@ export class CreateOrderDto {
   @IsOptional()
   paymentMethod?: PaymentMethodEnum = PaymentMethodEnum.CASH_ON_DELIVERY;
 
-  @ApiPropertyOptional({ example: 60.0, default: 60.0, description: 'Delivery charge' })
+  @ApiPropertyOptional({
+    example: 50.0,
+    description: 'Delivery fee (calculated dynamically by server based on distance and free delivery threshold)',
+  })
   @Type(() => Number)
   @IsNumber()
   @IsOptional()
-  deliveryFee?: number = 60.0;
+  deliveryFee?: number;
 
   @ApiPropertyOptional({ example: 'Please deliver after 5 PM' })
   @IsString()

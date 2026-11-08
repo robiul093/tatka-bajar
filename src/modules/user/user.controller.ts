@@ -28,22 +28,34 @@ import { Roles } from '../../common/decorator/roles.decorator';
 import { GetCurrentUser } from '../../common/decorator/get-current-user.decorator';
 import { sendResponse } from '../../common/helpers/api-response.helper';
 import { IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+const toOptionalString = ({ value }: { value: any }) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'string' && value.trim() === '') return undefined;
+  return value;
+};
 
 export class UpdateProfileDto {
-  @ApiPropertyOptional({ example: 'John Doe' })
+  @ApiPropertyOptional({ example: 'John Doe', description: 'User full name' })
+  @Transform(toOptionalString)
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiPropertyOptional({ example: '01712345678' })
+  @ApiPropertyOptional({ example: '01712345678', description: 'Contact phone number' })
+  @Transform(toOptionalString)
   @IsString()
   @IsOptional()
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/demo/image/upload/avatar.jpg' })
-  @IsString()
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Profile avatar image file (JPEG, PNG, WEBP, max 5MB)',
+  })
   @IsOptional()
-  profile?: string;
+  profile?: any;
 }
 
 @ApiTags('User')
@@ -64,12 +76,34 @@ export class UserController {
   }
 
   @Patch('profile')
-  @ApiOperation({ summary: 'Update profile details (name, phone, avatar URL)' })
+  @UseInterceptors(FileInterceptor('profile'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Update profile details (name, phone, and profile photo file upload)',
+    description:
+      'Updates user profile details. The profile avatar can be uploaded directly as a binary image file in the `profile` field.',
+  })
   async updateProfile(
     @GetCurrentUser('userId') userId: string,
     @Body() dto: UpdateProfileDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    const data = await this.userService.updateProfile(userId, dto);
+    let profileUrl: string | undefined = undefined;
+    if (file) {
+      profileUrl = await this.cloudinaryService.uploadImage(
+        file,
+        'tatka-bajar/avatars',
+      );
+    } else if (typeof dto.profile === 'string' && dto.profile.trim() !== '') {
+      profileUrl = dto.profile.trim();
+    }
+
+    const updateData: { name?: string; phone?: string; profile?: string } = {};
+    if (dto.name) updateData.name = dto.name;
+    if (dto.phone) updateData.phone = dto.phone;
+    if (profileUrl !== undefined) updateData.profile = profileUrl;
+
+    const data = await this.userService.updateProfile(userId, updateData);
     return sendResponse(HttpStatus.OK, 'Profile updated successfully', data);
   }
 

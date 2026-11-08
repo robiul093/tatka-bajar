@@ -9,12 +9,12 @@ import { Redis } from 'ioredis';
 let apm: any;
 try {
   apm = require('elastic-apm-node');
-} catch {}
+} catch { }
 
 let RedisStore: any;
 try {
   RedisStore = require('rate-limit-redis');
-} catch {}
+} catch { }
 
 export async function getAvailablePort(
   startPort: number,
@@ -148,13 +148,13 @@ export function setupSwagger(
     .setTitle(`${appName} Documentation`)
     .setDescription(
       `Documentation and interactive API specifications for ${appName}.\n\n` +
-        `**Base URL:** \`http://localhost:${port}/api/v1\`\n\n` +
-        '**Auth:** Use the `POST /api/v1/auth/login` endpoint to obtain a Bearer token, ' +
-        'then click **Authorize** above.',
+      `**Base URL:** \`http://localhost:${port}/api/v1\`\n\n` +
+      '**Auth:** Use the `POST /api/v1/auth/login` endpoint to obtain a Bearer token, ' +
+      'then click **Authorize** above.',
     )
     .setVersion(appVersion)
-    .addServer(`http://localhost:${port}`, 'Local Development')
     .addServer('/', 'Current Host')
+    .addServer(`http://localhost:${port}`, 'Local Development')
     .addBearerAuth(
       {
         type: 'http',
