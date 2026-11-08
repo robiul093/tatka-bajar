@@ -345,23 +345,14 @@ export class OrderService {
 
     subtotal = Number(subtotal.toFixed(2));
 
-    // Dynamic delivery fee calculation based on product origin (originLat, originLng) and delivery coordinates
-    let deliveryFee: number;
-    if (dto.deliveryFee !== undefined && dto.deliveryFee !== null) {
-      // If client supplied deliveryFee, respect it or check free delivery threshold
-      deliveryFee =
-        subtotal >= DELIVERY_RULES.FREE_DELIVERY_THRESHOLD
-          ? 0
-          : Number(dto.deliveryFee);
-    } else {
-      deliveryFee = this.calculateDeliveryFee(
-        subtotal,
-        deliveryLat,
-        deliveryLng,
-        primaryOriginLat,
-        primaryOriginLng,
-      ).deliveryFee;
-    }
+    // Authoritative dynamic delivery fee calculation based on product origin and customer delivery coordinates
+    const deliveryFee = this.calculateDeliveryFee(
+      subtotal,
+      deliveryLat,
+      deliveryLng,
+      primaryOriginLat,
+      primaryOriginLng,
+    ).deliveryFee;
 
     const totalAmount = Number((subtotal + deliveryFee).toFixed(2));
     const orderNumber = this.generateOrderNumber();
